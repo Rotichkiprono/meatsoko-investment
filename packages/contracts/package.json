@@ -1,1 +1,1 @@
-{"name": "@meatsoko/contracts", "version": "1.0.0", "private": true}
+{"name":"@meatsoko/contracts","version":"1.0.0","private":true,"dependencies":{"@chainlink/contracts":"^1.5.0"}}
