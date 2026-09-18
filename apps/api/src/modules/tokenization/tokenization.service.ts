@@ -83,7 +83,7 @@ export class TokenizationService implements OnModuleInit, OnModuleDestroy {
 
     if (subError || !subData) throw new Error(`Valid funded subscription not found: ${subscriptionId}`);
 
-    const recipientAddress = subData.investor_wallets.wallet_address_evm;
+    const recipientAddress = subData.investor_wallets[0].wallet_address_evm;
     const tokensToTransfer = subData.token_quantity_allocated;
     const tokenAddress = this.configService.get<string>('hedera.securityTokenAddress');
 

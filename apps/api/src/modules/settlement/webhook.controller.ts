@@ -3,6 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 import * as crypto from 'crypto';
 
+interface RawBodyRequest extends Request {
+  rawBody: Buffer;
+}
+
 @Controller('webhooks/paystack')
 export class WebhookController {
   constructor(private readonly configService: ConfigService) {}
@@ -10,7 +14,7 @@ export class WebhookController {
   @Post()
   @HttpCode(200)
   async handlePaystackWebhook(
-    @Req() req: Request,
+    @Req() req: RawBodyRequest,
     @Res() res: Response,
     @Headers('x-paystack-signature') signature: string,
   ) {
