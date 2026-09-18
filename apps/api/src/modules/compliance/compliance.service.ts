@@ -4,6 +4,7 @@ import { Storage } from '@google-cloud/storage';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { PubSub } from '@google-cloud/pubsub';
 
+
 @Injectable()
 export class ComplianceService {
   private storage: Storage;
@@ -12,6 +13,12 @@ export class ComplianceService {
   private pubsub: PubSub;
 
   constructor(private configService: ConfigService) {
+
+    this.storage = new Storage({
+      projectId: this.configService.get<string>('gcp.projectId'),
+    });
+    this.bucketName = this.configService.get<string>('gcp.storageBucket');
+
     const supabaseUrl =
       this.configService.get<string>('supabase.url') ||
       process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -23,11 +30,6 @@ export class ComplianceService {
     if (!supabaseUrl || !supabaseKey) {
       throw new Error('Supabase URL and service role key must be configured.');
     }
-
-    this.storage = new Storage({
-      projectId: this.configService.get<string>('gcp.projectId'),
-    });
-    this.bucketName = this.configService.get<string>('gcp.storageBucket');
 
     this.supabase = createClient(supabaseUrl, supabaseKey);
 
