@@ -1,7 +1,6 @@
 FROM node:24-alpine
 
-# Install native build tools (python3, make, g++) required for compiling C++ node modules
-# The --no-cache flag ensures we don't store the apk index, keeping the image small
+# Install native build tools required for compiling C++ node modules
 RUN apk add --no-cache python3 make g++
 
 # Enable pnpm via corepack
@@ -19,18 +18,24 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api ./apps/api
 COPY packages ./packages
 
-# Suppress interactive prompts in CI/CD environments
+# Suppress interactive prompts in CI/CD environments natively
 ENV CI=true
 
-# Replace "@meatsoko/api" with the EXACT "name" from apps/api/package.json
+# Install all dependencies (dev dependencies are required for the NestJS TS build)
+RUN pnpm install --frozen-lockfile
+
+# Build the API 
 RUN pnpm --filter @meatsoko/api build
 
-# Prune development dependencies cleanly without hanging on prompts
-RUN pnpm install --prod --frozen-lockfile --non-interactive
+# Clean install of ONLY production dependencies. 
+# We removed the invalid --non-interactive flag here.
+RUN pnpm install --prod --frozen-lockfile
 
 # Cloud Run defaults to port 8080
 EXPOSE 8080
 
+# Move execution context into the API directory
 WORKDIR /app/apps/api
 
+# Execute the compiled NestJS binary
 CMD ["node", "dist/main.js"]
