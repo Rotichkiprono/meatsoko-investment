@@ -6,19 +6,21 @@ import { InvestorModule } from './modules/investor/investor.module';
 import { KycModule } from './modules/kyc/kyc.module';
 import { ComplianceModule } from './modules/compliance/compliance.module';
 import { TokenizationModule } from './modules/tokenization/tokenization.module';
+import { SettlementModule } from './modules/settlement/settlement.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],
-      envFilePath: '../../.env',
+      envFilePath: ['.env', '../../.env', '../.env'],
     }),
     AuthModule,
     InvestorModule,
     KycModule,
     ComplianceModule,
     TokenizationModule,
+    SettlementModule,
   ],
   controllers: [],
   providers: [],
