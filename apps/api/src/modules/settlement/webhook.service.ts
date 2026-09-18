@@ -12,6 +12,18 @@ export class WebhookService {
   private supabase: SupabaseClient;
 
   constructor(private configService: ConfigService) {
+    const supabaseUrl =
+      this.configService.get<string>('supabase.url') ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      process.env.SUPABASE_URL;
+    const supabaseKey =
+      this.configService.get<string>('supabase.serviceRoleKey') ||
+      process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase URL and service role key must be configured.');
+    }
+
     this.redis = new Redis({
       host: this.configService.get<string>('redis.host'),
       port: this.configService.get<number>('redis.port'),
@@ -21,10 +33,7 @@ export class WebhookService {
       projectId: this.configService.get<string>('gcp.projectId'),
     });
 
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      this.configService.get<string>('secrets.supabase')
-    );
+    this.supabase = createClient(supabaseUrl, supabaseKey);
   }
 
   async processSuccessfulCharge(data: any): Promise<void> {

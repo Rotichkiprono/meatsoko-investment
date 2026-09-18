@@ -12,16 +12,25 @@ export class ComplianceService {
   private pubsub: PubSub;
 
   constructor(private configService: ConfigService) {
+    const supabaseUrl =
+      this.configService.get<string>('supabase.url') ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      process.env.SUPABASE_URL;
+    const supabaseKey =
+      this.configService.get<string>('supabase.serviceRoleKey') ||
+      process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase URL and service role key must be configured.');
+    }
+
     this.storage = new Storage({
       projectId: this.configService.get<string>('gcp.projectId'),
     });
     this.bucketName = this.configService.get<string>('gcp.storageBucket');
-    
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      this.configService.get<string>('secrets.supabase')
-    );
-    
+
+    this.supabase = createClient(supabaseUrl, supabaseKey);
+
     this.pubsub = new PubSub({
       projectId: this.configService.get<string>('gcp.projectId'),
     });
