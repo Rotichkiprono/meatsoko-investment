@@ -4,6 +4,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { PubSub, Subscription } from '@google-cloud/pubsub';
 import { ethers } from 'ethers';
 
+const ERC20_ABI = ["function transfer(address to, uint256 amount) external returns (bool)"];
+
 const IDENTITY_REGISTRY_ABI = [
   "function registerIdentity(address userAddress, address identity, uint16 country) external",
   "function isVerified(address userAddress) external view returns (bool)"
@@ -17,6 +19,7 @@ export class TokenizationService implements OnModuleInit, OnModuleDestroy {
   private kycSubscription: Subscription;
   private provider: ethers.JsonRpcProvider;
   private operatorWallet: ethers.Wallet | null = null;
+  private fundingSubscription: Subscription;
 
   constructor(private configService: ConfigService) {
     this.supabase = createClient(
@@ -41,6 +44,91 @@ export class TokenizationService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.startKycApprovalListener();
+    this.startFundingCompletedListener();
+  }
+
+  private startFundingCompletedListener() {
+    const subscriptionName = 'investment.funding.completed-sub';
+    try {
+      this.fundingSubscription = this.pubsub.subscription(subscriptionName);
+      this.fundingSubscription.on('message', async (message) => {
+        try {
+          const payload = JSON.parse(message.data.toString());
+          await this.handleTokenDispatch(payload.subscriptionId);
+          message.ack();
+        } catch (error: any) {
+          this.logger.error(`Error processing token dispatch: ${error.message}`);
+          message.nack();
+        }
+      });
+      this.fundingSubscription.on('error', (err: any) => {
+        this.logger.warn(`PubSub Funding Subscription offline or inactive: ${err.message}`);
+      });
+    } catch (e: any) {
+      this.logger.warn(`Failed to attach funding Pub/Sub subscriber: ${e.message}`);
+    }
+  }
+
+  private async handleTokenDispatch(subscriptionId: string) {
+    if (!this.operatorWallet) throw new Error('Operator wallet not initialized');
+
+    this.logger.log(`Initiating treasury dispatch for subscription: ${subscriptionId}`);
+
+    // 1. Verify Funded Status & Fetch Recipient Target
+    const { data: subData, error: subError } = await this.supabase
+      .from('subscriptions')
+      .select('token_quantity_allocated, investor_wallets(wallet_address_evm)')
+      .eq('id', subscriptionId)
+      .eq('status', 'FUNDS_RECEIVED')
+      .single();
+
+    if (subError || !subData) throw new Error(`Valid funded subscription not found: ${subscriptionId}`);
+
+    const recipientAddress = subData.investor_wallets.wallet_address_evm;
+    const tokensToTransfer = subData.token_quantity_allocated;
+    const tokenAddress = this.configService.get<string>('hedera.securityTokenAddress');
+
+    if (!tokenAddress) throw new Error('MEAT_SECURITY_TOKEN_ADDRESS not configured');
+
+    const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.operatorWallet);
+
+    // Convert decimal allocation to integer based on the 4 decimals defined in the schema
+    const decimals = 4;
+    const amountInBaseUnits = ethers.parseUnits(tokensToTransfer.toString(), decimals);
+
+    try {
+      // 2. Execute On-Chain Transfer
+      const tx = await tokenContract.transfer(recipientAddress, amountInBaseUnits);
+      this.logger.log(`ERC-20 transfer submitted to Hedera: ${tx.hash}`);
+
+      const receipt = await tx.wait();
+      
+      if (receipt.status === 1) {
+        // 3. Confirm Allocation and Reconcile Ledgers
+        await this.supabase
+          .from('token_allocations')
+          .insert({
+            subscription_id: subscriptionId,
+            recipient_evm_address: recipientAddress,
+            tokens_transferred: tokensToTransfer,
+            transaction_hash: tx.hash,
+            block_number: receipt.blockNumber,
+            execution_status: 'CONFIRMED'
+          });
+
+        await this.supabase
+          .from('subscriptions')
+          .update({ status: 'ALLOCATED' })
+          .eq('id', subscriptionId);
+
+        this.logger.log(`$MEAT Treasury dispatch confirmed for subscription: ${subscriptionId}`);
+      } else {
+        throw new Error('On-chain token transfer reverted.');
+      }
+    } catch (error: any) {
+      this.logger.error(`Token dispatch failed for ${recipientAddress}: ${error.message}`);
+      throw error;
+    }
   }
 
   private startKycApprovalListener() {
@@ -108,6 +196,9 @@ export class TokenizationService implements OnModuleInit, OnModuleDestroy {
   onModuleDestroy() {
     if (this.kycSubscription) {
       this.kycSubscription.close();
+    }
+    if (this.fundingSubscription) {
+      this.fundingSubscription.close();
     }
   }
 }
