@@ -1,0 +1,90 @@
+# Dependencies
+node_modules/
+**/node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+
+# Monorepo / build tooling
+.turbo/
+.cache/
+.nx/
+*.tsbuildinfo
+
+# Next.js / frontend
+apps/web/.next/
+apps/web/out/
+apps/web/.vercel/
+apps/web/.cache/
+
+# API / backend builds
+apps/api/dist/
+apps/api/build/
+apps/api/coverage/
+apps/api/.env
+
+# Package outputs
+packages/*/dist/
+packages/*/build/
+packages/*/coverage/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+.env.local
+.env.*.local
+.env.keys
+
+# Testing / coverage
+coverage/
+.nyc_output/
+htmlcov/
+
+# OS / editor metadata
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Supabase local files
+.supabase/
+.branches
+.temp
+supabase/.branches
+supabase/.temp
+supabase/.env
+
+# Database / local data dumps
+*.sqlite
+*.sqlite3
+*.db
+db/*.sqlite
+db/*.db
+
+# Docker / local runtime data
+.docker/
+*.pid
+*.pid.lock
+.tmp/
+tmp/
+temp/
+
+# Misc generated artifacts
+out/
+dist/
+build/
+public/build/
+

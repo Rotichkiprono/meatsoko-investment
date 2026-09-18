@@ -1,0 +1,19 @@
+{
+  "name": "meatsoko-investment-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:push": "pnpm --filter @meatsoko/database db:push",
+    "db:types": "pnpm --filter @meatsoko/database gen:types"
+  },
+  "devDependencies": {
+    "turbo": "^2.10.13",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@9.12.0"
+}
