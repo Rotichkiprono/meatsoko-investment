@@ -5,6 +5,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { InvestorModule } from './modules/investor/investor.module';
 import { KycModule } from './modules/kyc/kyc.module';
 import { ComplianceModule } from './modules/compliance/compliance.module';
+import { TokenizationModule } from './modules/tokenization/tokenization.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ComplianceModule } from './modules/compliance/compliance.module';
     InvestorModule,
     KycModule,
     ComplianceModule,
+    TokenizationModule,
   ],
   controllers: [],
   providers: [],
