@@ -7,10 +7,14 @@ export class InvestorService {
   private supabase: SupabaseClient;
 
   constructor(private configService: ConfigService) {
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      this.configService.get<string>('secrets.supabase')
-    );
+    const supabaseUrl = this.configService.get<string>('supabase.url');
+    const supabaseKey = this.configService.get<string>('supabase.serviceRoleKey');
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase credentials are not configured in ConfigService.');
+    }
+
+    this.supabase = createClient(supabaseUrl, supabaseKey);
   }
 
   async onboardInvestor(
