@@ -53,5 +53,8 @@ export default async () => {
       securityTokenAddress: process.env.MEAT_SECURITY_TOKEN_ADDRESS,
       kycWhitelistAddress: process.env.ERC3643_KYC_WHITELIST_ADDRESS,
     },
+    oracle: {
+      apiKey: process.env.ORACLE_API_KEY || 'development_key',
+    },
   };
 };
