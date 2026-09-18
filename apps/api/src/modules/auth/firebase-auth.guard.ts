@@ -1,5 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import admin from 'firebase-admin';
+import { getAuth } from 'firebase-admin/auth';
+
 @Injectable()
 export class FirebaseAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -13,10 +14,7 @@ export class FirebaseAuthGuard implements CanActivate {
     const token = authHeader.split('Bearer ')[1];
 
     try {
-      // Verify the JWT via Firebase Admin
-      const decodedToken = await admin.auth().verifyIdToken(token);
-      
-      // Attach the decoded token (which includes uid and email) to the request
+      const decodedToken = await getAuth().verifyIdToken(token);
       request.user = decodedToken;
       return true;
     } catch (error) {
