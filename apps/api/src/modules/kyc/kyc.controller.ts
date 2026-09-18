@@ -21,4 +21,8 @@ export class KycController {
 
     return this.kycService.generateUploadUrl(investorId, body.fileType, body.documentType);
   }
+  @Post('submit')
+  async submitKyc(@Body() body: { documentType: string; storagePath: string }, @Req() req: any) {
+    return this.kycService.submitKyc(req.user.uid, body.documentType, body.storagePath);
+  }
 }

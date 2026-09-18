@@ -20,4 +20,12 @@ export class ComplianceController {
     const adminUid = req.user.uid; 
     return this.complianceService.approveKyc(id, adminUid);
   }
+  @Post('kyc-verifications/:id/reject')
+  async rejectKyc(
+    @Param('id') id: string, 
+    @Body() body: { rejectionReason: string }, 
+    @Req() req: any
+  ) {
+    return this.complianceService.rejectKyc(id, req.user.uid, body.rejectionReason);
+  }
 }

@@ -85,4 +85,39 @@ export class ComplianceService {
 
     return { message: 'KYC approved. Whitelisting initialized.' };
   }
+  async rejectKyc(kycId: string, adminUid: string, rejectionReason: string) {
+    // 1. Update verification status to REJECTED with reason
+    const { data: kycRecord, error: kycError } = await this.supabase
+      .from('kyc_verifications')
+      .update({ 
+        verification_status: 'REJECTED',
+        rejection_reason: rejectionReason,
+        reviewed_by_user_id: adminUid, // Now safely accepts the 28-char Firebase UID
+        reviewed_at: new Date().toISOString()
+      })
+      .eq('id', kycId)
+      .select()
+      .single();
+
+    if (kycError || !kycRecord) throw new NotFoundException('KYC record not found');
+
+    // 2. Cascade rejection to the investor's profile
+    await this.supabase
+      .from('investors')
+      .update({ accreditation_status: 'REJECTED' })
+      .eq('id', kycRecord.investor_id);
+
+    // 3. Emit Pub/Sub Event
+    const topic = this.pubsub.topic('investor.kyc_rejected');
+    await topic.publishMessage({
+      data: Buffer.from(JSON.stringify({
+        investorId: kycRecord.investor_id,
+        kycId,
+        rejectionReason,
+        timestamp: Math.floor(Date.now() / 1000)
+      })),
+    });
+
+    return { message: 'KYC application rejected.' };
+  }
 }

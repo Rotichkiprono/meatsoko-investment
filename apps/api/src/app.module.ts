@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import configuration from './config/configuration';
 import { AuthModule } from './modules/auth/auth.module';
+import { InvestorModule } from './modules/investor/investor.module';
 import { KycModule } from './modules/kyc/kyc.module';
+import { ComplianceModule } from './modules/compliance/compliance.module';
 
 @Module({
   imports: [
@@ -12,8 +14,9 @@ import { KycModule } from './modules/kyc/kyc.module';
       envFilePath: '../../.env',
     }),
     AuthModule,
+    InvestorModule,
     KycModule,
-    // WebhookModule will be added here subsequently
+    ComplianceModule,
   ],
   controllers: [],
   providers: [],
