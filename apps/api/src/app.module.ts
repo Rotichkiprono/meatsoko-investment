@@ -7,6 +7,7 @@ import { KycModule } from './modules/kyc/kyc.module';
 import { ComplianceModule } from './modules/compliance/compliance.module';
 import { TokenizationModule } from './modules/tokenization/tokenization.module';
 import { SettlementModule } from './modules/settlement/settlement.module';
+import { SubscriptionModule } from './modules/subscription/subscription.module';
 
 @Module({
   imports: [
@@ -21,8 +22,11 @@ import { SettlementModule } from './modules/settlement/settlement.module';
     ComplianceModule,
     TokenizationModule,
     SettlementModule,
+    SubscriptionModule,
   ],
   controllers: [],
   providers: [],
+  exports: [],
+  
 })
 export class AppModule {}
