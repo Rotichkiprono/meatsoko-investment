@@ -8,6 +8,7 @@ import { ComplianceModule } from './modules/compliance/compliance.module';
 import { TokenizationModule } from './modules/tokenization/tokenization.module';
 import { SettlementModule } from './modules/settlement/settlement.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
+import { OracleModule } from './modules/oracle/oracle.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { SubscriptionModule } from './modules/subscription/subscription.module';
     TokenizationModule,
     SettlementModule,
     SubscriptionModule,
+    OracleModule,
   ],
   controllers: [],
   providers: [],
