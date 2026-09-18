@@ -15,7 +15,6 @@ export class SubscriptionService {
   }
 
   async initializeCheckout(firebaseUid: string, tokenQuantity: number) {
-    // 1. Strict Identity & Wallet State Validation
     const { data: investor, error: investorError } = await this.supabase
       .from('investors')
       .select('id, email, accreditation_status, investor_wallets(id, is_whitelisted)')
@@ -30,7 +29,6 @@ export class SubscriptionService {
       throw new BadRequestException('Wallet must be whitelisted on the Hedera ledger before investing.');
     }
 
-    // 2. Fetch Open Investment Product & Compute Settlement
     const { data: product, error: productError } = await this.supabase
       .from('investment_products')
       .select('id, nominal_token_price_cents')
@@ -40,56 +38,59 @@ export class SubscriptionService {
       
     if (productError || !product) throw new BadRequestException('No active $MEAT investment product available.');
 
-    // Compute fiat amount based on the $1.00 USD nominal base price 
     const fiatAmountCents = tokenQuantity * product.nominal_token_price_cents;
-    
-    // 3. Initialize Aggregator Settlement Session
-    const paystackSecret = this.configService.get<string>('paystack.secretKey');
+
+    // Persist pending subscription to generate the UUID mapped to the Paystack metadata
+    const { data: subscription, error: subError } = await this.supabase
+        .from('subscriptions')
+        .insert({
+            investor_id: investor.id,
+            product_id: product.id,
+            wallet_id: activeWallet.id,
+            fiat_amount_cents: fiatAmountCents,
+            token_quantity_allocated: tokenQuantity,
+            payment_method: 'PAYSTACK',
+            status: 'SUBMITTED', 
+        })
+        .select('id')
+        .single();
+        
+    if (subError) throw new InternalServerErrorException(`Failed to persist subscription: ${subError.message}`);
+
     try {
       const response = await axios.post(
-        'https://api.paystack.co/transaction/initialize',
-        {
-          email: investor.email,
-          amount: fiatAmountCents, // Handled in strictly scaled cents
-          currency: 'USD',
-          channels: ['card', 'mobile_money', 'bank_transfer'],
-          metadata: {
-            subscriptionId: null, // We will append this after inserting the DB row
-            investorId: investor.id,
-            walletId: activeWallet.id,
+          'https://api.paystack.co/transaction/initialize',
+          {
+            email: investor.email,
+            amount: fiatAmountCents,
+            currency: 'USD',
+            channels: ['card', 'mobile_money', 'bank_transfer'],
+            metadata: {
+                subscriptionId: subscription.id, 
+                investorId: investor.id,
+                walletId: activeWallet.id,
+            }
+          },
+          {
+            headers: {
+                Authorization: `Bearer ${this.configService.get<string>('paystack.secretKey')}`,
+                'Content-Type': 'application/json',
+            }
           }
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${paystackSecret}`,
-            'Content-Type': 'application/json',
-          }
-        }
       );
 
       const paymentReference = response.data.data.reference;
       const authorizationUrl = response.data.data.authorization_url;
 
-      // 4. Register the Pending Subscription
-      const { data: subscription, error: subError } = await this.supabase
+      await this.supabase
         .from('subscriptions')
-        .insert({
-          investor_id: investor.id,
-          product_id: product.id,
-          wallet_id: activeWallet.id,
-          fiat_amount_cents: fiatAmountCents,
-          token_quantity_allocated: tokenQuantity,
-          payment_method: 'PAYSTACK',
-          payment_reference: paymentReference,
-          status: 'SUBMITTED',
-        })
-        .select('id')
-        .single();
-
-      if (subError) throw new InternalServerErrorException(`Failed to persist subscription: ${subError.message}`);
+        .update({ payment_reference: paymentReference })
+        .eq('id', subscription.id);
 
       return { checkoutUrl: authorizationUrl, reference: paymentReference, subscriptionId: subscription.id };
     } catch (error: any) {
+      // Rollback on Paystack failure to prevent orphaned deadlocks
+      await this.supabase.from('subscriptions').delete().eq('id', subscription.id);
       throw new InternalServerErrorException(`Checkout initialization failed: ${error.response?.data?.message || error.message}`);
     }
   }

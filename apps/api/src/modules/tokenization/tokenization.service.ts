@@ -74,7 +74,6 @@ export class TokenizationService implements OnModuleInit, OnModuleDestroy {
 
     this.logger.log(`Initiating treasury dispatch for subscription: ${subscriptionId}`);
 
-    // 1. Verify Funded Status & Fetch Recipient Target
     const { data: subData, error: subError } = await this.supabase
       .from('subscriptions')
       .select('token_quantity_allocated, investor_wallets(wallet_address_evm)')
@@ -92,19 +91,18 @@ export class TokenizationService implements OnModuleInit, OnModuleDestroy {
 
     const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.operatorWallet);
 
-    // Convert decimal allocation to integer based on the 4 decimals defined in the schema
     const decimals = 4;
-    const amountInBaseUnits = ethers.parseUnits(tokensToTransfer.toString(), decimals);
+    // Safely cast the dynamic Supabase numeric return to a strict 4-decimal string to prevent precision loss
+    const safeTokenQuantity = Number(tokensToTransfer).toFixed(decimals);
+    const amountInBaseUnits = ethers.parseUnits(safeTokenQuantity, decimals);
 
     try {
-      // 2. Execute On-Chain Transfer
       const tx = await tokenContract.transfer(recipientAddress, amountInBaseUnits);
       this.logger.log(`ERC-20 transfer submitted to Hedera: ${tx.hash}`);
 
       const receipt = await tx.wait();
       
       if (receipt.status === 1) {
-        // 3. Confirm Allocation and Reconcile Ledgers
         await this.supabase
           .from('token_allocations')
           .insert({
