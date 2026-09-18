@@ -21,21 +21,17 @@ COPY packages ./packages
 # Suppress interactive prompts in CI/CD environments natively
 ENV CI=true
 
-# Install all dependencies (dev dependencies are required for the NestJS TS build)
-RUN pnpm install --frozen-lockfile
+# 1. Change to --no-frozen-lockfile to allow the container to resolve the new NestJS packages
+RUN pnpm install --no-frozen-lockfile
 
 # Build the API 
 RUN pnpm --filter @meatsoko/api build
 
-# Clean install of ONLY production dependencies. 
-# We removed the invalid --non-interactive flag here.
-RUN pnpm install --prod --frozen-lockfile
+# 2. Also change the production prune to --no-frozen-lockfile
+RUN pnpm install --prod --no-frozen-lockfile
 
-# Cloud Run defaults to port 8080
 EXPOSE 8080
 
-# Move execution context into the API directory
 WORKDIR /app/apps/api
 
-# Execute the compiled NestJS binary
 CMD ["node", "dist/main.js"]
