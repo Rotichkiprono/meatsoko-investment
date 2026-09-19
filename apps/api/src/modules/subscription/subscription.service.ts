@@ -75,6 +75,7 @@ export class SubscriptionService {
         product_id: product.id,
         wallet_id: activeWallet.id,
         fiat_amount_cents: fiatAmountCents,
+        currency: "KES",
         token_quantity_allocated: tokenQuantity,
         payment_method: "PAYSTACK",
         status: "SUBMITTED",
@@ -91,7 +92,7 @@ export class SubscriptionService {
       const paystackPayload: any = {
         email: investor.email,
         amount: fiatAmountCents,
-        currency: "USD",
+        currency: "KES",
         channels: ["card", "mobile_money", "bank_transfer"],
         metadata: {
           subscriptionId: subscription.id,

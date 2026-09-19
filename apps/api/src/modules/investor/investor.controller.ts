@@ -1,13 +1,13 @@
-import { Controller, Post, Body, Req, UseGuards } from '@nestjs/common';
-import { InvestorService } from './investor.service';
-import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
+import { Controller, Post, Get, Body, Req, UseGuards } from "@nestjs/common";
+import { InvestorService } from "./investor.service";
+import { FirebaseAuthGuard } from "../auth/firebase-auth.guard";
 
-@Controller('investors')
+@Controller("investors")
 @UseGuards(FirebaseAuthGuard)
 export class InvestorController {
   constructor(private readonly investorService: InvestorService) {}
 
-  @Post('onboard')
+  @Post("onboard")
   async onboard(@Body() body: any, @Req() req: any) {
     const { uid, email } = req.user;
     return this.investorService.onboardInvestor(
@@ -17,7 +17,12 @@ export class InvestorController {
       body.entityType,
       body.countryIso,
       body.walletAddressEvm,
-      body.walletType
+      body.walletType,
     );
+  }
+
+  @Get("me")
+  async getProfile(@Req() req: any) {
+    return this.investorService.getInvestorProfile(req.user.uid);
   }
 }
