@@ -3,7 +3,7 @@ import { SubscriptionService } from "./subscription.service";
 import { FirebaseAuthGuard } from "../auth/firebase-auth.guard";
 import { CheckoutDto } from "./dto/checkout.dto";
 
-@Controller("subscriptions")
+@Controller(["subscriptions", "subscription"])
 @UseGuards(FirebaseAuthGuard)
 export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) {}
@@ -13,6 +13,7 @@ export class SubscriptionController {
     return this.subscriptionService.initializeCheckout(
       req.user.uid,
       dto.tokenQuantity,
+      dto.callbackUrl,
     );
   }
 }

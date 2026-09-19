@@ -18,7 +18,11 @@ export class SubscriptionService {
     );
   }
 
-  async initializeCheckout(firebaseUid: string, tokenQuantity: number) {
+  async initializeCheckout(
+    firebaseUid: string,
+    tokenQuantity: number,
+    callbackUrl?: string,
+  ) {
     if (
       !Number.isInteger(tokenQuantity) ||
       tokenQuantity < 1 ||
@@ -84,19 +88,25 @@ export class SubscriptionService {
       );
 
     try {
+      const paystackPayload: any = {
+        email: investor.email,
+        amount: fiatAmountCents,
+        currency: "USD",
+        channels: ["card", "mobile_money", "bank_transfer"],
+        metadata: {
+          subscriptionId: subscription.id,
+          investorId: investor.id,
+          walletId: activeWallet.id,
+        },
+      };
+
+      if (callbackUrl) {
+        paystackPayload.callback_url = callbackUrl;
+      }
+
       const response = await axios.post(
         "https://api.paystack.co/transaction/initialize",
-        {
-          email: investor.email,
-          amount: fiatAmountCents,
-          currency: "USD",
-          channels: ["card", "mobile_money", "bank_transfer"],
-          metadata: {
-            subscriptionId: subscription.id,
-            investorId: investor.id,
-            walletId: activeWallet.id,
-          },
-        },
+        paystackPayload,
         {
           headers: {
             Authorization: `Bearer ${this.configService.get<string>(

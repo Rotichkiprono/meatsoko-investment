@@ -1,5 +1,12 @@
 import { Type } from "class-transformer";
-import { IsInt, Min, Max, IsNotEmpty } from "class-validator";
+import {
+  IsInt,
+  Min,
+  Max,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from "class-validator";
 
 export class CheckoutDto {
   @Type(() => Number)
@@ -8,4 +15,8 @@ export class CheckoutDto {
   @Max(100000, { message: "Maximum per-transaction limit exceeded." })
   @IsNotEmpty()
   tokenQuantity: number;
+
+  @IsOptional()
+  @IsString()
+  callbackUrl?: string;
 }

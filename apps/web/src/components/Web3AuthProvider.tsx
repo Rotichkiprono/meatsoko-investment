@@ -12,18 +12,22 @@ import {
 } from "firebase/auth";
 import { auth, googleProvider } from "../lib/firebase";
 
+import { BrowserProvider } from "ethers";
+
 export const Web3AuthContext = createContext<{
   provider: IProvider | null;
   web3auth: Web3Auth | null;
   login: () => Promise<void>;
   logout: () => Promise<void>;
   idToken: string | null;
+  userAddress: string | null;
 }>({
   provider: null,
   web3auth: null,
   login: async () => {},
   logout: async () => {},
   idToken: null,
+  userAddress: null,
 });
 
 const chainConfig = {
@@ -45,6 +49,27 @@ export default function Web3AuthProvider({
   const [web3auth, setWeb3auth] = useState<Web3Auth | null>(null);
   const [provider, setProvider] = useState<IProvider | null>(null);
   const [idToken, setIdToken] = useState<string | null>(null);
+  const [userAddress, setUserAddress] = useState<string | null>(null);
+
+  // Derive EVM address when provider is available
+  useEffect(() => {
+    const fetchAddress = async () => {
+      if (provider) {
+        try {
+          const ethersProvider = new BrowserProvider(provider);
+          const signer = await ethersProvider.getSigner();
+          const addr = await signer.getAddress();
+          setUserAddress(addr);
+        } catch (err) {
+          console.error("Failed to get address:", err);
+          setUserAddress(null);
+        }
+      } else {
+        setUserAddress(null);
+      }
+    };
+    fetchAddress();
+  }, [provider]);
 
   // Restore Firebase idToken if user has an active session
   useEffect(() => {
@@ -121,11 +146,12 @@ export default function Web3AuthProvider({
     await signOut(auth);
     setProvider(null);
     setIdToken(null);
+    setUserAddress(null);
   };
 
   return (
     <Web3AuthContext.Provider
-      value={{ provider, web3auth, login, logout, idToken }}
+      value={{ provider, web3auth, login, logout, idToken, userAddress }}
     >
       {children}
     </Web3AuthContext.Provider>
