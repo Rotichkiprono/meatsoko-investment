@@ -1,9 +1,9 @@
 staging:
   rpcs:
     - chain-name: hedera-testnet
-      url: ${HEDERA_JSON_RPC_URL}
+      url: https://testnet.hashio.io/api
 
 production:
   rpcs:
     - chain-name: hedera-testnet
-      url: ${HEDERA_JSON_RPC_URL}
+      url: https://testnet.hashio.io/api
