@@ -4,7 +4,12 @@ import { useEffect, useState, createContext, ReactNode } from "react";
 import { Web3Auth } from "@web3auth/modal";
 import { CHAIN_NAMESPACES, type IProvider } from "@web3auth/base";
 import { WALLET_CONNECTORS, AUTH_CONNECTION } from "@web3auth/no-modal";
-import { signInWithPopup, type UserCredential, signOut } from "firebase/auth";
+import {
+  signInWithPopup,
+  type UserCredential,
+  signOut,
+  onAuthStateChanged,
+} from "firebase/auth";
 import { auth, googleProvider } from "../lib/firebase";
 
 export const Web3AuthContext = createContext<{
@@ -41,6 +46,23 @@ export default function Web3AuthProvider({
   const [provider, setProvider] = useState<IProvider | null>(null);
   const [idToken, setIdToken] = useState<string | null>(null);
 
+  // Restore Firebase idToken if user has an active session
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const token = await user.getIdToken();
+          setIdToken(token);
+        } catch (e) {
+          console.error("Failed to restore idToken:", e);
+        }
+      } else {
+        setIdToken(null);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   useEffect(() => {
     const init = async () => {
       try {
@@ -75,14 +97,17 @@ export default function Web3AuthProvider({
       const firebaseIdToken = await userCredential.user.getIdToken(true);
       setIdToken(firebaseIdToken);
 
-      const connection = await web3auth.connectTo(WALLET_CONNECTORS.AUTH, {
-        authConnection: AUTH_CONNECTION.CUSTOM,
-        authConnectionId: "meatsoko-firebase",
-        idToken: firebaseIdToken,
-        extraLoginOptions: {
-          verifierIdField: "sub",
-        },
-      });
+      let connection = web3auth.connection;
+      if (!web3auth.connected) {
+        connection = await web3auth.connectTo(WALLET_CONNECTORS.AUTH, {
+          authConnection: AUTH_CONNECTION.CUSTOM,
+          authConnectionId: "meatsoko-firebase",
+          idToken: firebaseIdToken,
+          extraLoginOptions: {
+            verifierIdField: "sub",
+          },
+        });
+      }
 
       setProvider(connection?.ethereumProvider ?? null);
     } catch (error) {

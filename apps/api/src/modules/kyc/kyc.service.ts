@@ -33,7 +33,9 @@ export class KycService {
     this.storage = new Storage({
       projectId: this.configService.get<string>("gcp.projectId"),
     });
-    this.bucketName = this.configService.get<string>("gcp.storageBucket");
+    this.bucketName = (
+      this.configService.get<string>("gcp.storageBucket") || ""
+    ).replace(/^gs:\/\//, "");
     this.pubsub = new PubSub({
       projectId: this.configService.get<string>("gcp.projectId"),
     });
@@ -75,7 +77,8 @@ export class KycService {
         uploadUrl,
         storagePath,
       };
-    } catch {
+    } catch (error: any) {
+      console.error("Failed to generate secure upload URL:", error);
       throw new InternalServerErrorException(
         "Failed to generate secure upload URL",
       );

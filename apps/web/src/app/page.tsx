@@ -1,6 +1,7 @@
 "use client";
 
 import { useContext, useEffect, useState } from "react";
+import Link from "next/link";
 import { BrowserProvider } from "ethers";
 import { Web3AuthContext } from "../components/Web3AuthProvider";
 
@@ -116,9 +117,11 @@ export default function HomePage() {
             </div>
 
             <div className="pt-4 space-y-3">
-              <button className="w-full bg-slate-800 text-white font-semibold py-3 px-4 rounded-xl hover:bg-slate-900 transition shadow-sm">
-                Proceed to KYC
-              </button>
+              <Link href="/kyc" className="w-full inline-block">
+                <button className="w-full bg-slate-800 text-white font-semibold py-3 px-4 rounded-xl hover:bg-slate-900 transition shadow-sm">
+                  Proceed to KYC
+                </button>
+              </Link>
               <button
                 onClick={logout}
                 className="w-full bg-white border border-slate-200 text-slate-700 font-semibold py-3 px-4 rounded-xl hover:bg-slate-50 transition"
