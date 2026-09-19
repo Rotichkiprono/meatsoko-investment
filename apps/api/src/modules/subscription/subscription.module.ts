@@ -1,8 +1,10 @@
-import { Module } from '@nestjs/common';
-import { SubscriptionController } from './subscription.controller';
-import { SubscriptionService } from './subscription.service';
+import { Module } from "@nestjs/common";
+import { SubscriptionController } from "./subscription.controller";
+import { SubscriptionService } from "./subscription.service";
+import { TokenizationModule } from "../tokenization/tokenization.module";
 
 @Module({
+  imports: [TokenizationModule],
   controllers: [SubscriptionController],
   providers: [SubscriptionService],
   exports: [SubscriptionService],

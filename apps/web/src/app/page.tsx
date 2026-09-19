@@ -4,6 +4,7 @@ import { useContext, useEffect, useState } from "react";
 import Link from "next/link";
 import { BrowserProvider } from "ethers";
 import { Web3AuthContext } from "../components/Web3AuthProvider";
+import { auth } from "../lib/firebase";
 
 interface InvestorProfile {
   id: string;
@@ -11,11 +12,12 @@ interface InvestorProfile {
   fullName: string;
   accreditationStatus: "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
   walletAddress: string | null;
+  hederaAccountId: string | null;
   isWhitelisted: boolean;
 }
 
 export default function HomePage() {
-  const { provider, login, logout, idToken, userAddress } =
+  const { provider, web3auth, login, logout, idToken, userAddress } =
     useContext(Web3AuthContext);
   const [address, setAddress] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<string>("");
@@ -23,6 +25,7 @@ export default function HomePage() {
   const [privateKey, setPrivateKey] = useState<string | null>(null);
   const [showPrivateKey, setShowPrivateKey] = useState<boolean>(false);
   const [copiedAddress, setCopiedAddress] = useState<boolean>(false);
+  const [copiedAccount, setCopiedAccount] = useState<boolean>(false);
   const [copiedKey, setCopiedKey] = useState<boolean>(false);
 
   useEffect(() => {
@@ -39,7 +42,12 @@ export default function HomePage() {
           if (apiUrl) {
             setSyncStatus("Synchronizing identity with MeatSoko API...");
 
-            // 1. Attempt onboarding if new user
+            const resolvedName =
+              auth.currentUser?.displayName ||
+              auth.currentUser?.email?.split("@")[0] ||
+              "Investor";
+
+            // 1. Attempt onboarding / wallet binding
             const onboardRes = await fetch(`${apiUrl}/investors/onboard`, {
               method: "POST",
               headers: {
@@ -47,7 +55,7 @@ export default function HomePage() {
                 Authorization: `Bearer ${idToken}`,
               },
               body: JSON.stringify({
-                fullName: "Kali Admin",
+                fullName: resolvedName,
                 entityType: "INDIVIDUAL",
                 countryIso: "KE",
                 walletAddressEvm: derivedAddress,
@@ -96,20 +104,54 @@ export default function HomePage() {
       return;
     }
 
-    if (!provider) return;
-
     try {
-      // In Web3Auth with Ethereum provider, eth_private_key returns the private key
-      const key = (await provider.request({
-        method: "eth_private_key",
-      })) as string;
-      setPrivateKey(key);
-      setShowPrivateKey(true);
+      let key: string | null = null;
+
+      // 1. Try web3auth.provider (Web3Auth SDK internal provider)
+      if ((web3auth as any)?.provider) {
+        try {
+          key = (await (web3auth as any).provider.request({
+            method: "eth_private_key",
+          })) as string;
+        } catch {
+          try {
+            key = (await (web3auth as any).provider.request({
+              method: "private_key",
+            })) as string;
+          } catch {
+            // continue
+          }
+        }
+      }
+
+      // 2. Try connected ethereumProvider
+      if (!key && provider) {
+        try {
+          key = (await (provider as any).request({
+            method: "private_key",
+          })) as string;
+        } catch {
+          try {
+            key = (await (provider as any).request({
+              method: "eth_private_key",
+            })) as string;
+          } catch {
+            // continue
+          }
+        }
+      }
+
+      if (key) {
+        const formatted = key.startsWith("0x") ? key : `0x${key}`;
+        setPrivateKey(formatted);
+        setShowPrivateKey(true);
+      } else {
+        alert(
+          "Your wallet is an MPC non-custodial wallet secured by your Google account. To sign into your wallet on another device or browser, simply sign in with the same Google account.",
+        );
+      }
     } catch (err) {
       console.error("Failed to retrieve private key:", err);
-      alert(
-        "Unable to export private key directly. Please use Web3Auth recovery.",
-      );
     }
   };
 
@@ -118,6 +160,15 @@ export default function HomePage() {
       navigator.clipboard.writeText(address);
       setCopiedAddress(true);
       setTimeout(() => setCopiedAddress(false), 2000);
+    }
+  };
+
+  const handleCopyAccount = () => {
+    const accountId = profile?.hederaAccountId;
+    if (accountId) {
+      navigator.clipboard.writeText(accountId);
+      setCopiedAccount(true);
+      setTimeout(() => setCopiedAccount(false), 2000);
     }
   };
 
@@ -130,6 +181,7 @@ export default function HomePage() {
   };
 
   const accreditationStatus = profile?.accreditationStatus || "UNVERIFIED";
+  const hederaId = profile?.hederaAccountId;
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-50 font-sans">
@@ -178,7 +230,31 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Wallet Address Section */}
+            {/* Hedera Account ID Section */}
+            {hederaId && (
+              <div className="text-left bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">
+                    Hedera Account ID
+                  </span>
+                  <button
+                    onClick={handleCopyAccount}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
+                  >
+                    {copiedAccount ? "Copied!" : "Copy ID"}
+                  </button>
+                </div>
+                <div className="text-lg font-mono font-bold text-blue-950">
+                  {hederaId}
+                </div>
+                <p className="text-[11px] text-blue-600 mt-1">
+                  Active Hedera testnet account. Use this ID in Hedera
+                  Tokenization Studio.
+                </p>
+              </div>
+            )}
+
+            {/* EVM Address Section */}
             <div className="text-left bg-slate-50 p-4 rounded-xl border border-slate-200">
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -194,7 +270,18 @@ export default function HomePage() {
               <div className="bg-white p-2.5 rounded-lg text-xs text-slate-700 font-mono break-all border border-slate-200">
                 {address || userAddress || "Deriving address..."}
               </div>
-              {address && (
+              {hederaId ? (
+                <div className="mt-2 text-right">
+                  <a
+                    href={`https://hashscan.io/testnet/account/${hederaId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:underline inline-flex items-center"
+                  >
+                    View Account {hederaId} on HashScan ↗
+                  </a>
+                </div>
+              ) : address ? (
                 <div className="mt-2 text-right">
                   <a
                     href={`https://hashscan.io/testnet/account/${address}`}
@@ -205,7 +292,7 @@ export default function HomePage() {
                     View on HashScan Explorer ↗
                   </a>
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/* Export Private Key (Wallet Access) */}
@@ -254,6 +341,12 @@ export default function HomePage() {
 
             {/* Action Buttons Based on Status */}
             <div className="pt-2 space-y-3">
+              <Link href="/portfolio" className="w-full inline-block">
+                <button className="w-full bg-slate-100 text-slate-700 font-semibold py-3 px-4 rounded-xl hover:bg-slate-200 transition">
+                  View Portfolio & Transactions
+                </button>
+              </Link>
+
               {accreditationStatus === "VERIFIED" && (
                 <Link href="/invest" className="w-full inline-block">
                   <button className="w-full bg-emerald-600 text-white font-semibold py-3 px-4 rounded-xl hover:bg-emerald-700 transition shadow-sm">

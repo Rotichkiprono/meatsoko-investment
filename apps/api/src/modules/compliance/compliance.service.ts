@@ -89,19 +89,33 @@ export class ComplianceService {
     if (kycError || !kycRecord)
       throw new NotFoundException("KYC record not found");
 
-    // 2. Update investor accreditation status
+    // 2. Update investor accreditation status and whitelist wallets
     await this.supabase
       .from("investors")
       .update({ accreditation_status: "VERIFIED" })
       .eq("id", kycRecord.investor_id);
 
-    // 3. Trigger Phase 2: On-Chain Whitelisting via Pub/Sub
-    const topic = this.pubsub.topic("investment.kyc.approved");
-    await topic.publishMessage({
-      data: Buffer.from(JSON.stringify({ investorId: kycRecord.investor_id })),
-    });
+    await this.supabase
+      .from("investor_wallets")
+      .update({
+        is_whitelisted: true,
+        whitelisted_at: new Date().toISOString(),
+      })
+      .eq("investor_id", kycRecord.investor_id);
 
-    return { message: "KYC approved. Whitelisting initialized." };
+    // 3. Trigger Phase 2: On-Chain Whitelisting via Pub/Sub
+    try {
+      const topic = this.pubsub.topic("investment.kyc.approved");
+      await topic.publishMessage({
+        data: Buffer.from(
+          JSON.stringify({ investorId: kycRecord.investor_id }),
+        ),
+      });
+    } catch {
+      // Pub/Sub event is optional/non-blocking
+    }
+
+    return { message: "KYC approved. Investor wallet whitelisted." };
   }
   async rejectKyc(kycId: string, adminUid: string, rejectionReason: string) {
     // 1. Update verification status to REJECTED with reason

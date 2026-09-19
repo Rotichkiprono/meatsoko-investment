@@ -55,7 +55,7 @@ export class WebhookService {
     let payload: any;
     try {
       payload = JSON.parse(rawBody.toString("utf8"));
-    } catch (err) {
+    } catch {
       throw new BadRequestException("Malformed JSON payload");
     }
 
@@ -74,11 +74,11 @@ export class WebhookService {
       throw new BadRequestException("Missing transaction reference");
     }
 
-    // 2. Fetch Subscription State
+    // 2. Fetch Subscription State using payment_reference
     const { data: subscription, error: fetchErr } = await this.supabase
       .from("subscriptions")
-      .select("id, status, token_quantity, investor_id")
-      .eq("reference", reference)
+      .select("id, status, token_quantity_allocated, investor_id")
+      .eq("payment_reference", reference)
       .maybeSingle();
 
     if (fetchErr) {
@@ -95,10 +95,10 @@ export class WebhookService {
       return;
     }
 
-    // 3. Idempotency Check: Exit cleanly if already processed or processing
+    // 3. Idempotency Check: Exit cleanly if already allocated or settled
     if (
-      subscription.status === "completed" ||
-      subscription.status === "processing"
+      subscription.status === "ALLOCATED" ||
+      subscription.status === "SETTLED"
     ) {
       this.logger.warn(
         `Subscription ${subscription.id} is already in state '${subscription.status}'. Skipping.`,
@@ -106,26 +106,28 @@ export class WebhookService {
       return;
     }
 
-    // 4. Atomic Lock: Transition status from 'pending' to 'processing'
+    // 4. Atomic Lock: Transition status from 'SUBMITTED' to 'FUNDS_RECEIVED'
     const { data: updatedSub, error: updateErr } = await this.supabase
       .from("subscriptions")
-      .update({ status: "processing", updated_at: new Date().toISOString() })
+      .update({
+        status: "FUNDS_RECEIVED",
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", subscription.id)
-      .eq("status", "pending")
+      .eq("status", "SUBMITTED")
       .select("id")
       .maybeSingle();
 
     if (updateErr || !updatedSub) {
       this.logger.warn(
-        `Race condition detected: Subscription ${subscription.id} was already claimed by another process.`,
+        `Race condition detected: Subscription ${subscription.id} was already claimed or updated.`,
       );
       return;
     }
 
-    // 5. Trigger Hedera EVM Token Minting
+    // 5. Trigger Hedera EVM Token Transfer
     try {
-      const tokenizationService = this.tokenizationService as any;
-      await tokenizationService.handleTokenDispatch(subscription.id);
+      await this.tokenizationService.handleTokenDispatch(subscription.id);
       this.logger.log(
         `Subscription ${subscription.id} tokens successfully dispatched.`,
       );
@@ -133,16 +135,12 @@ export class WebhookService {
       this.logger.error(
         `Failed to dispatch tokens for subscription ${subscription.id}: ${mintError.message}`,
       );
-
-      // Rollback status to failed so it can be audited or retried
+      // Keep as FUNDS_RECEIVED so it can be retried once account is whitelisted
       await this.supabase
         .from("subscriptions")
         .update({
-          status: "failed",
-          metadata: {
-            failure_reason: mintError.message,
-            failed_at: new Date().toISOString(),
-          },
+          status: "FUNDS_RECEIVED",
+          updated_at: new Date().toISOString(),
         })
         .eq("id", subscription.id);
 

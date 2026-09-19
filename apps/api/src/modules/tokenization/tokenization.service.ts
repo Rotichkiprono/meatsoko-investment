@@ -8,10 +8,12 @@ import { ConfigService } from "@nestjs/config";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { ethers } from "ethers";
 
-// Minimal ERC-3643 Token Interface for Minting & Verification
-const ERC3643_ABI = [
+// Minimal ERC-20 / ERC-3643 Token Interface
+const TOKEN_ABI = [
+  "function transfer(address to, uint256 amount) returns (bool)",
   "function mint(address _to, uint256 _amount) external",
   "function decimals() view returns (uint8)",
+  "function balanceOf(address account) view returns (uint256)",
   "function identityRegistry() view returns (address)",
 ];
 
@@ -39,7 +41,9 @@ export class TokenizationService {
       "hedera.operatorPrivateKey",
     );
     this.tokenAddress =
-      this.configService.get<string>("hedera.securityTokenAddress") || "";
+      this.configService.get<string>("hedera.securityTokenAddress") ||
+      process.env.MEAT_SECURITY_TOKEN_ADDRESS ||
+      "";
 
     if (!supabaseUrl || !supabaseKey) {
       throw new Error("Supabase credentials missing in TokenizationService");
@@ -76,13 +80,14 @@ export class TokenizationService {
       .select(
         `
         id,
-        token_quantity,
+        token_quantity_allocated,
         status,
         investor_id,
+        wallet_id,
         investor_wallets (
           wallet_address_evm,
-          status,
-          is_primary
+          hedera_account_id,
+          is_whitelisted
         )
       `,
       )
@@ -96,33 +101,30 @@ export class TokenizationService {
       throw new BadRequestException("Subscription not found");
     }
 
-    // 2. Safe Array & Address Validation
-    const wallets = subData.investor_wallets as Array<{
+    const wallet = subData.investor_wallets as unknown as {
       wallet_address_evm: string;
-      status: string;
-      is_primary?: boolean;
-    }> | null;
+      hedera_account_id: string | null;
+      is_whitelisted: boolean;
+    } | null;
 
-    if (!wallets || !Array.isArray(wallets) || wallets.length === 0) {
+    if (!wallet || !wallet.wallet_address_evm) {
       throw new BadRequestException(
         `No wallet registered for investor ${subData.investor_id}`,
       );
     }
 
-    // Prefer primary wallet, otherwise default to first available
-    const primaryWallet = wallets.find((w) => w.is_primary) || wallets[0];
-    const recipientAddress = primaryWallet.wallet_address_evm;
+    const recipientAddress = wallet.wallet_address_evm;
 
-    if (!recipientAddress || !ethers.isAddress(recipientAddress)) {
+    if (!ethers.isAddress(recipientAddress)) {
       throw new BadRequestException(
         `Invalid destination EVM address: ${recipientAddress}`,
       );
     }
 
-    const tokenQuantity = Number(subData.token_quantity);
+    const tokenQuantity = Number(subData.token_quantity_allocated);
     if (isNaN(tokenQuantity) || tokenQuantity <= 0) {
       throw new BadRequestException(
-        `Invalid token quantity: ${subData.token_quantity}`,
+        `Invalid token quantity: ${subData.token_quantity_allocated}`,
       );
     }
 
@@ -130,75 +132,82 @@ export class TokenizationService {
       `Dispatching ${tokenQuantity} MEAT tokens to ${recipientAddress} for subscription ${subscriptionId}...`,
     );
 
-    // 3. Connect to Token Contract
+    // 2. Connect to Token Contract
     const tokenContract = new ethers.Contract(
       this.tokenAddress,
-      ERC3643_ABI,
+      TOKEN_ABI,
       this.wallet,
     );
 
-    // 4. Optional OnchainID Verification Check
+    // 3. Check Decimals (Contract has 4 decimals)
+    let decimals = 4;
     try {
-      const identityRegistryAddress = await tokenContract.identityRegistry();
-      if (
-        identityRegistryAddress &&
-        ethers.isAddress(identityRegistryAddress)
-      ) {
-        const registryContract = new ethers.Contract(
-          identityRegistryAddress,
-          IDENTITY_REGISTRY_ABI,
-          this.provider,
-        );
-        const isVerified = await registryContract.isVerified(recipientAddress);
-        if (!isVerified) {
-          this.logger.warn(
-            `Wallet ${recipientAddress} has not passed ERC-3643 OnchainID validation.`,
-          );
-        }
-      }
-    } catch (regErr: any) {
-      this.logger.debug(
-        `Skipping external registry verification check: ${regErr.message}`,
-      );
-    }
-
-    // 5. Calculate Token Units (Standard 18 decimals)
-    let decimals = 18;
-    try {
-      decimals = await tokenContract.decimals();
-    } catch (e) {
-      this.logger.debug(
-        "Could not query decimals from token contract, falling back to 18.",
-      );
+      decimals = Number(await tokenContract.decimals());
+    } catch {
+      this.logger.debug("Falling back to 4 decimals for MEAT token.");
     }
 
     const amountInUnits = ethers.parseUnits(tokenQuantity.toString(), decimals);
 
-    // 6. Sign and Send Mint Transaction on Hedera EVM
-    const tx = await tokenContract.mint(recipientAddress, amountInUnits);
+    // 4. Send Transfer from Treasury (fallback to Mint if transfer reverts)
+    let tx: ethers.ContractTransactionResponse;
+    try {
+      this.logger.log(
+        `Attempting transfer of ${amountInUnits} from treasury (${this.wallet.address}) to ${recipientAddress}...`,
+      );
+      tx = await tokenContract.transfer(recipientAddress, amountInUnits);
+    } catch (transferErr: any) {
+      this.logger.warn(
+        `Transfer failed (${transferErr.message}), attempting mint fallback...`,
+      );
+      tx = await tokenContract.mint(recipientAddress, amountInUnits);
+    }
+
     this.logger.log(
-      `Mint transaction submitted: ${tx.hash}. Waiting for confirmation...`,
+      `Transaction submitted: ${tx.hash}. Waiting for confirmation...`,
     );
 
     const receipt = await tx.wait(1);
+    if (!receipt) {
+      throw new InternalServerErrorException(
+        "Transaction receipt was null after confirmation.",
+      );
+    }
+
     this.logger.log(
-      `Mint confirmed in block ${receipt.blockNumber} (Hash: ${tx.hash})`,
+      `Token transfer confirmed in block ${receipt.blockNumber} (Hash: ${tx.hash})`,
     );
 
-    // 7. Finalize Database State
+    // 5. Finalize Database State
     const { error: updateErr } = await this.supabase
       .from("subscriptions")
       .update({
-        status: "completed",
-        transaction_hash: tx.hash,
-        completed_at: new Date().toISOString(),
+        status: "ALLOCATED",
         updated_at: new Date().toISOString(),
       })
       .eq("id", subscriptionId);
 
     if (updateErr) {
       this.logger.error(
-        `Critical: Mint succeeded (${tx.hash}) but failed to update subscription ${subscriptionId} status: ${updateErr.message}`,
+        `Critical: Token transfer succeeded (${tx.hash}) but failed to update subscription status: ${updateErr.message}`,
+      );
+    }
+
+    // 6. Record Token Allocation
+    const { error: allocErr } = await this.supabase
+      .from("token_allocations")
+      .insert({
+        subscription_id: subscriptionId,
+        recipient_evm_address: recipientAddress,
+        tokens_transferred: tokenQuantity,
+        transaction_hash: tx.hash,
+        block_number: receipt.blockNumber,
+        execution_status: "CONFIRMED",
+      });
+
+    if (allocErr) {
+      this.logger.error(
+        `Failed to record token allocation: ${allocErr.message}`,
       );
     }
 
