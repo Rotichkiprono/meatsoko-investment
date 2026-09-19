@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useState, createContext, ReactNode } from 'react';
-import { Web3Auth } from '@web3auth/modal';
-import { CHAIN_NAMESPACES, type IProvider, type IWeb3Auth } from '@web3auth/base';
-import { WALLET_CONNECTORS } from '@web3auth/no-modal';
-import { EthereumPrivateKeyProvider } from '@web3auth/ethereum-provider';
-import { AuthAdapter } from '@web3auth/auth-adapter';
-import { signInWithPopup, type UserCredential, signOut } from 'firebase/auth';
-import { auth, googleProvider } from '../lib/firebase';
+import { useEffect, useState, createContext, ReactNode } from "react";
+import { Web3Auth } from "@web3auth/modal";
+import {
+  CHAIN_NAMESPACES,
+  type IProvider,
+  type IWeb3Auth,
+} from "@web3auth/base";
+import { WALLET_CONNECTORS } from "@web3auth/no-modal";
+import { EthereumPrivateKeyProvider } from "@web3auth/ethereum-provider";
+import { AuthAdapter } from "@web3auth/auth-adapter";
+import { signInWithPopup, type UserCredential, signOut } from "firebase/auth";
+import { auth, googleProvider } from "../lib/firebase";
 
 export const Web3AuthContext = createContext<{
   provider: IProvider | null;
@@ -25,12 +29,12 @@ export const Web3AuthContext = createContext<{
 
 const chainConfig = {
   chainNamespace: CHAIN_NAMESPACES.EIP155,
-  chainId: '0x128',
+  chainId: "0x128",
   rpcTarget: process.env.NEXT_PUBLIC_HEDERA_RPC_URL!,
-  displayName: 'Hedera Testnet',
-  blockExplorerUrl: 'https://hashscan.io/testnet',
-  ticker: 'HBAR',
-  tickerName: 'Hedera',
+  displayName: "Hedera Testnet",
+  blockExplorerUrl: "https://hashscan.io/testnet",
+  ticker: "HBAR",
+  tickerName: "Hedera",
 };
 
 export default function Web3AuthProvider({
@@ -50,32 +54,34 @@ export default function Web3AuthProvider({
         });
         const web3authInstance = new Web3Auth({
           clientId: process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID!,
-          web3AuthNetwork: 'sapphire_devnet',
+          web3AuthNetwork: "sapphire_devnet",
           privateKeyProvider: privateKeyProvider as never,
         });
 
         const authAdapter = new AuthAdapter({
           adapterSettings: {
             clientId: process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID!,
-            network: 'testnet',
+            network: "testnet",
             loginConfig: {
               jwt: {
-                name: 'Meatsoko Firebase JWT',
-                verifier: 'meatsoko-firebase',
-                typeOfLogin: 'jwt',
+                name: "Meatsoko Firebase JWT",
+                verifier: "meatsoko-firebase",
+                typeOfLogin: "jwt",
                 clientId: process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID!,
               },
             },
           },
         });
 
-        (web3authInstance as unknown as IWeb3Auth).configureAdapter(authAdapter);
+        (web3authInstance as unknown as IWeb3Auth).configureAdapter(
+          authAdapter,
+        );
 
         await web3authInstance.init();
         setProvider(web3authInstance.connection?.ethereumProvider ?? null);
         setWeb3auth(web3authInstance);
       } catch (error) {
-        console.error('Web3Auth Initialization Error:', error);
+        console.error("Web3Auth Initialization Error:", error);
       }
     };
 
@@ -86,21 +92,24 @@ export default function Web3AuthProvider({
     if (!web3auth) return;
 
     try {
-      const userCredential: UserCredential = await signInWithPopup(auth, googleProvider);
+      const userCredential: UserCredential = await signInWithPopup(
+        auth,
+        googleProvider,
+      );
       const firebaseIdToken = await userCredential.user.getIdToken(true);
       setIdToken(firebaseIdToken);
 
       const connection = await web3auth.connectTo(WALLET_CONNECTORS.AUTH, {
-        loginProvider: 'jwt',
+        loginProvider: "jwt",
         extraLoginOptions: {
           id_token: firebaseIdToken,
-          verifierIdField: 'sub',
+          verifierIdField: "sub",
         },
       });
 
       setProvider(connection?.ethereumProvider ?? null);
     } catch (error) {
-      console.error('Login error:', error);
+      console.error("Login error:", error);
     }
   };
 
@@ -113,7 +122,9 @@ export default function Web3AuthProvider({
   };
 
   return (
-    <Web3AuthContext.Provider value={{ provider, web3auth, login, logout, idToken }}>
+    <Web3AuthContext.Provider
+      value={{ provider, web3auth, login, logout, idToken }}
+    >
       {children}
     </Web3AuthContext.Provider>
   );
