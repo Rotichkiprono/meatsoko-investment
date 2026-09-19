@@ -2,14 +2,8 @@
 
 import { useEffect, useState, createContext, ReactNode } from "react";
 import { Web3Auth } from "@web3auth/modal";
-import {
-  CHAIN_NAMESPACES,
-  type IProvider,
-  type IWeb3Auth,
-} from "@web3auth/base";
-import { WALLET_CONNECTORS } from "@web3auth/no-modal";
-import { EthereumPrivateKeyProvider } from "@web3auth/ethereum-provider";
-import { AuthAdapter } from "@web3auth/auth-adapter";
+import { CHAIN_NAMESPACES, type IProvider } from "@web3auth/base";
+import { WALLET_CONNECTORS, AUTH_CONNECTION } from "@web3auth/no-modal";
 import { signInWithPopup, type UserCredential, signOut } from "firebase/auth";
 import { auth, googleProvider } from "../lib/firebase";
 
@@ -35,6 +29,7 @@ const chainConfig = {
   blockExplorerUrl: "https://hashscan.io/testnet",
   ticker: "HBAR",
   tickerName: "Hedera",
+  logo: "https://cryptologos.cc/logos/hedera-hbar-logo.png",
 };
 
 export default function Web3AuthProvider({
@@ -49,33 +44,14 @@ export default function Web3AuthProvider({
   useEffect(() => {
     const init = async () => {
       try {
-        const privateKeyProvider = new EthereumPrivateKeyProvider({
-          config: { chainConfig },
-        });
         const web3authInstance = new Web3Auth({
           clientId: process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID!,
           web3AuthNetwork: "sapphire_devnet",
-          privateKeyProvider: privateKeyProvider as never,
-        });
-
-        const authAdapter = new AuthAdapter({
-          adapterSettings: {
-            clientId: process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID!,
-            network: "testnet",
-            loginConfig: {
-              jwt: {
-                name: "Meatsoko Firebase JWT",
-                verifier: "meatsoko-firebase",
-                typeOfLogin: "jwt",
-                clientId: process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID!,
-              },
-            },
+          chains: [chainConfig],
+          uiConfig: {
+            uxMode: "popup",
           },
         });
-
-        (web3authInstance as unknown as IWeb3Auth).configureAdapter(
-          authAdapter,
-        );
 
         await web3authInstance.init();
         setProvider(web3authInstance.connection?.ethereumProvider ?? null);
@@ -100,9 +76,10 @@ export default function Web3AuthProvider({
       setIdToken(firebaseIdToken);
 
       const connection = await web3auth.connectTo(WALLET_CONNECTORS.AUTH, {
-        loginProvider: "jwt",
+        authConnection: AUTH_CONNECTION.CUSTOM,
+        authConnectionId: "meatsoko-firebase",
+        idToken: firebaseIdToken,
         extraLoginOptions: {
-          id_token: firebaseIdToken,
           verifierIdField: "sub",
         },
       });

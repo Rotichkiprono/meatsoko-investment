@@ -29,7 +29,7 @@ export default function HomePage() {
                 Authorization: `Bearer ${idToken}`,
               },
               body: JSON.stringify({
-                fullName: "",
+                fullName: "Kali Admin",
                 entityType: "INDIVIDUAL",
                 countryIso: "KE",
                 walletAddressEvm: userAddress,
@@ -38,7 +38,21 @@ export default function HomePage() {
             });
 
             if (!response.ok) {
-              throw new Error("API Sync Failed");
+              const errorText = await response.text();
+              console.error(
+                "Backend Rejection Data:",
+                response.status,
+                errorText,
+              );
+              // If investor already exists, treat as successfully synced
+              if (response.status === 409) {
+                setSyncStatus("Profile synchronized (already registered).");
+                return;
+              }
+              setSyncStatus(`API Error: ${response.status} - ${errorText}`);
+              throw new Error(
+                `API Sync Failed: ${response.status} - ${errorText}`,
+              );
             }
 
             setSyncStatus("Profile synchronized securely.");
@@ -47,9 +61,11 @@ export default function HomePage() {
               "Wallet connected. Backend sync is not configured yet.",
             );
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error("Backend Sync Error:", error);
-          setSyncStatus("Failed to sync wallet with backend.");
+          setSyncStatus(
+            error?.message || "Failed to sync wallet with backend.",
+          );
         }
       } else {
         setAddress(null);
