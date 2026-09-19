@@ -96,6 +96,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.3.0
         version: 19.3.0(@types/react@19.3.0)
+      '@web3auth/auth-adapter':
+        specifier: ^9.7.0
+        version: 9.7.0(@babel/runtime@7.29.7)
       '@web3auth/base':
         specifier: ^9.7.0
         version: 9.7.0(@babel/runtime@7.29.7)
@@ -2909,6 +2912,12 @@ packages:
 
   '@walletconnect/window-metadata@1.0.1':
     resolution: {integrity: sha512-9koTqyGrM2cqFRW517BPY/iEtUDx2r1+Pwwu5m7sJ7ka79wi3EyqhqcICk/yDmv6jAS1rjKgTKXlEhanYjijcA==}
+
+  '@web3auth/auth-adapter@9.7.0':
+    resolution: {integrity: sha512-pjjaTZcn593avmpBvF4sKWEaxpr/eTQjuGqq6/o0RKi67IfD5HTsSREqgiBU1eM+ytPaKglKdPbKwXRgy7oHyQ==}
+    engines: {node: '>=18.x', npm: '>=9.x'}
+    peerDependencies:
+      '@babel/runtime': ^7.x
 
   '@web3auth/auth@11.8.3':
     resolution: {integrity: sha512-6JSZEhjshS5+xfbz565Hsij5jMcjANtNf1CXTeaMD0jNfYHlTFhIUJ6ZSoIVC8sU6gmzKXehzwF9JSJOrNB3aw==}
@@ -10057,6 +10066,19 @@ snapshots:
     dependencies:
       '@walletconnect/window-getters': 1.0.1
       tslib: 1.14.1
+
+  '@web3auth/auth-adapter@9.7.0(@babel/runtime@7.29.7)':
+    dependencies:
+      '@babel/runtime': 7.29.7
+      '@web3auth/auth': 9.6.4(@babel/runtime@7.29.7)
+      '@web3auth/base': 9.7.0(@babel/runtime@7.29.7)
+      '@web3auth/base-provider': 9.7.0(@babel/runtime@7.29.7)
+      deepmerge: 4.3.1
+    transitivePeerDependencies:
+      - '@sentry/types'
+      - bufferutil
+      - supports-color
+      - utf-8-validate
 
   '@web3auth/auth@11.8.3(@babel/runtime@7.29.7)(@sentry/core@10.75.0)(color@5.0.3)':
     dependencies:
