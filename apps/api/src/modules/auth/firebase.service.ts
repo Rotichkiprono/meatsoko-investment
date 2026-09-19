@@ -7,7 +7,7 @@ export class FirebaseService implements OnModuleInit {
   private readonly logger = new Logger(FirebaseService.name);
   private initialized = false;
 
-  constructor(private configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) {}
 
   isInitialized(): boolean {
     return this.initialized;
@@ -19,20 +19,22 @@ export class FirebaseService implements OnModuleInit {
       return;
     }
 
-    try {
-      const projectId = process.env.FIREBASE_PROJECT_ID;
-      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-      const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(
-        /\\n/g,
-        "\n",
+    const projectId =
+      this.configService.get<string>("FIREBASE_PROJECT_ID") ||
+      this.configService.get<string>("gcp.projectId");
+    const clientEmail = this.configService.get<string>("FIREBASE_CLIENT_EMAIL");
+    let privateKey = this.configService.get<string>("FIREBASE_PRIVATE_KEY");
+
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new Error(
+        "Firebase Admin SDK credentials are missing from the configuration.",
       );
+    }
 
-      if (!projectId || !clientEmail || !privateKey) {
-        throw new Error(
-          "Missing Firebase configuration: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are required.",
-        );
-      }
+    // CRITICAL: Restore actual newlines from Secret Manager escaped strings
+    privateKey = privateKey.replace(/\\n/g, "\n");
 
+    try {
       initializeApp({
         credential: cert({
           projectId,
@@ -43,12 +45,11 @@ export class FirebaseService implements OnModuleInit {
 
       this.initialized = true;
       this.logger.log("Firebase Admin SDK initialized successfully");
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unknown Firebase initialization error";
-      this.logger.error("Failed to initialize Firebase Admin SDK", message);
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to initialize Firebase Admin SDK: ${error.message}`,
+      );
+      throw error;
     }
   }
 }
