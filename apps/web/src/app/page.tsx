@@ -40,16 +40,16 @@ export default function HomePage() {
 
             if (!response.ok) {
               const errorText = await response.text();
-              console.error(
-                "Backend Rejection Data:",
-                response.status,
-                errorText,
-              );
               // If investor already exists, treat as successfully synced
               if (response.status === 409) {
                 setSyncStatus("Profile synchronized (already registered).");
                 return;
               }
+              console.error(
+                "Backend Rejection Data:",
+                response.status,
+                errorText,
+              );
               setSyncStatus(`API Error: ${response.status} - ${errorText}`);
               throw new Error(
                 `API Sync Failed: ${response.status} - ${errorText}`,

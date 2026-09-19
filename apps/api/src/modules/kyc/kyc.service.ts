@@ -120,11 +120,17 @@ export class KycService {
     }
 
     // 2. Insert KYC Record
+    const docTypeMapping: Record<string, string> = {
+      drivers_license: "NATIONAL_ID",
+    };
+    const normalizedDocType =
+      docTypeMapping[documentType] || documentType.toUpperCase();
+
     const { error: insertError } = await this.supabase
       .from("kyc_verifications")
       .insert({
         investor_id: investor.id,
-        document_type: documentType,
+        document_type: normalizedDocType,
         document_storage_path: storagePath,
         verification_status: "PENDING",
       });
@@ -143,7 +149,7 @@ export class KycService {
       data: Buffer.from(
         JSON.stringify({
           investorId: investor.id,
-          documentType,
+          documentType: normalizedDocType,
           timestamp: Math.floor(Date.now() / 1000),
         }),
       ),

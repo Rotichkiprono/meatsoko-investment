@@ -110,7 +110,11 @@ export default function KycPage() {
             >
               <option value="national_id">National ID</option>
               <option value="passport">Passport</option>
+              <option value="proof_of_address">Proof of Address</option>
               <option value="drivers_license">Driver's License</option>
+              <option value="certificate_of_incorporation">
+                Certificate of Incorporation
+              </option>
             </select>
           </div>
 

@@ -5,6 +5,7 @@ export enum DocumentType {
   NATIONAL_ID = "national_id",
   DRIVERS_LICENSE = "drivers_license",
   PROOF_OF_ADDRESS = "proof_of_address",
+  CERTIFICATE_OF_INCORPORATION = "certificate_of_incorporation",
 }
 
 export class GenerateUploadUrlDto {
