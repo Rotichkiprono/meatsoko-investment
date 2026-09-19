@@ -1,0 +1,9 @@
+staging:
+  rpcs:
+    - chain-name: hedera-testnet
+      url: ${HEDERA_JSON_RPC_URL}
+
+production:
+  rpcs:
+    - chain-name: hedera-testnet
+      url: ${HEDERA_JSON_RPC_URL}

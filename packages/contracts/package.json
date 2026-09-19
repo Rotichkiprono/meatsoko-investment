@@ -1,1 +1,1 @@
-{"name":"@meatsoko/contracts","version":"1.0.0","private":true,"dependencies":{"@chainlink/contracts":"^1.5.0"}}
+{"name":"@meatsoko/contracts","version":"1.0.0","private":true,"dependencies":{"@chainlink/contracts":"^1.5.0"},"devDependencies":{"@nomicfoundation/hardhat-toolbox":"^7.0.0","hardhat":"^3.17.0"}}

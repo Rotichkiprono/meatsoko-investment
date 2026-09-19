@@ -1,0 +1,17 @@
+name: MeatValuationOracle
+version: 1.0.0
+
+targets:
+  staging:
+    user-workflow:
+      workflow-name: "meatsoko-oracle-staging"
+    workflow-artifacts:
+      workflow-path: "../src/functions/fetchValuation.js"
+      secrets-path: "./secrets.yaml"
+
+  production:
+    user-workflow:
+      workflow-name: "meatsoko-oracle-production"
+    workflow-artifacts:
+      workflow-path: "../src/functions/fetchValuation.js"
+      secrets-path: "./secrets.yaml"
