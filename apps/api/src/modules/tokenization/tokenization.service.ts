@@ -24,7 +24,7 @@ export class TokenizationService {
   private readonly logger = new Logger(TokenizationService.name);
   private readonly supabase: SupabaseClient;
   private readonly provider: ethers.JsonRpcProvider;
-  private readonly wallet: ethers.Wallet;
+  private readonly wallet: ethers.Wallet | undefined;
   private readonly tokenAddress: string;
 
   constructor(private readonly configService: ConfigService) {
@@ -48,11 +48,11 @@ export class TokenizationService {
     this.supabase = createClient(supabaseUrl, supabaseKey);
     this.provider = new ethers.JsonRpcProvider(rpcUrl);
 
-    if (privateKey) {
+    if (privateKey && ethers.isHexString(privateKey, 32)) {
       this.wallet = new ethers.Wallet(privateKey, this.provider);
     } else {
       this.logger.warn(
-        "HEDERA_OPERATOR_PRIVATE_KEY is not defined. Read-only mode.",
+        "HEDERA_OPERATOR_PRIVATE_KEY is missing or invalid. Read-only mode.",
       );
     }
   }
